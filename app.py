@@ -58,7 +58,11 @@ def load_local_csv():
             "gender": random.choice(["M","F"]),
             "sport": sports[i % len(sports)],
             "state": states[i],
-            "score": random.randint(60
+            "score": random.randint(60,95),
+            "lat": round(random.uniform(8.5,30.9),4),
+            "lon": round(random.uniform(75.0,80.5),4),
+            "date": dat
+
 
 
 
