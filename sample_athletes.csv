@@ -1,0 +1,6 @@
+athlete_id,name,age,gender,sport,state,score,lat,lon,date,verified,video_url
+A001,Raj,16,M,Sprinting,Uttar Pradesh,78,26.8467,80.9462,2025-07-10,True,
+A002,Priya,15,F,Long Jump,Karnataka,84,12.9716,77.5946,2025-07-12,True,
+A003,Rahul,17,M,High Jump,Maharashtra,69,19.0760,72.8777,2025-07-11,False,
+A004,Anita,14,F,Sprinting,Tamil Nadu,91,13.0827,80.2707,2025-07-13,True,
+A005,Sunil,18,M,Long Jump,Punjab,72,31.1471,75.3412,2025-07-14,False,
