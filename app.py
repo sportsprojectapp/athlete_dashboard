@@ -28,9 +28,6 @@ def apply_theme(dark_mode=True):
         .stTable td, .stTable th {{
             color: {fg};
         }}
-        .css-1d391kg, .css-1v3fvcr {{
-            background-color: {bg};
-        }}
     </style>
     """, unsafe_allow_html=True)
 apply_theme(dark_mode)
@@ -48,20 +45,15 @@ def load_local_csv():
               "Gujarat", "Madhya Pradesh", "Odisha", "Assam", "West Bengal"]
     sample_videos = ["https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"]*10
     sample_photos = [f"https://randomuser.me/api/portraits/men/{i}.jpg" if i % 2 == 0 else f"https://randomuser.me/api/portraits/women/{i}.jpg" for i in range(20)]
+    
     sample = []
     for i in range(20):
         video_url = sample_videos[i] if i < 10 else ""
         athlete = {
             "athlete_id": f"A{str(i+1).zfill(3)}",
             "name": f"Athlete_{i+1}",
-            "age": random.randint(14,30),
-            "gender": random.choice(["M","F"]),
-            "sport": sports[i % len(sports)],
-            "state": states[i],
-            "score": random.randint(60,95),
-            "lat": round(random.uniform(8.5,30.9),4),
-            "lon": round(random.uniform(75.0,80.5),4),
-            "date": dat
+            "age": ra
+
 
 
 
