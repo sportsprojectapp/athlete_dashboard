@@ -6,20 +6,34 @@ from datetime import datetime
 import random
 
 # -------------------------------
-# Theme toggle
-# -------------------------------
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"
-
-st.sidebar.header("Dashboard Theme")
-theme_choice = st.sidebar.radio("Choose Theme", ["Light","Dark"], index=0 if st.session_state.theme=="light" else 1)
-st.session_state.theme = theme_choice.lower()
-dark_mode = st.session_state.theme == "dark"
-
-# -------------------------------
 # Page config
 # -------------------------------
 st.set_page_config(page_title="SAI-Assess Dashboard", layout="wide", page_icon="🏃‍♂️")
+
+# -------------------------------
+# Sidebar theme toggle
+# -------------------------------
+st.sidebar.header("Theme & Filters")
+dark_mode = st.sidebar.checkbox("Dark Mode", value=True)
+
+def apply_theme(dark_mode=True):
+    bg = "#111111" if dark_mode else "#FFFFFF"
+    fg = "#FFFFFF" if dark_mode else "#000000"
+    st.markdown(f"""
+    <style>
+        .stApp {{
+            background-color: {bg};
+            color: {fg};
+        }}
+        .stTable td, .stTable th {{
+            color: {fg};
+        }}
+        .css-1d391kg, .css-1v3fvcr {{
+            background-color: {bg};
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+apply_theme(dark_mode)
 
 # -------------------------------
 # Sample data generator
@@ -28,21 +42,12 @@ st.set_page_config(page_title="SAI-Assess Dashboard", layout="wide", page_icon="
 def load_local_csv():
     sports = ["Sprinting", "Long Jump", "High Jump", "Shot Put", "Javelin", 
               "Discus", "Swimming", "Cycling", "Gymnastics", "Wrestling"]
-
     states = ["Kerala", "Kerala", "Kerala", "Kerala", "Kerala", 
               "Karnataka", "Maharashtra", "Tamil Nadu", "Punjab", "Uttar Pradesh",
               "Bihar", "Rajasthan", "Goa", "Delhi", "Haryana", 
               "Gujarat", "Madhya Pradesh", "Odisha", "Assam", "West Bengal"]
-
-    sample_videos = [
-        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"
-    ] * 10
-
-    sample_photos = [
-        f"https://randomuser.me/api/portraits/men/{i}.jpg" if i % 2 == 0 else
-        f"https://randomuser.me/api/portraits/women/{i}.jpg" for i in range(20)
-    ]
-
+    sample_videos = ["https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"]*10
+    sample_photos = [f"https://randomuser.me/api/portraits/men/{i}.jpg" if i % 2 == 0 else f"https://randomuser.me/api/portraits/women/{i}.jpg" for i in range(20)]
     sample = []
     for i in range(20):
         video_url = sample_videos[i] if i < 10 else ""
@@ -62,61 +67,24 @@ def load_local_csv():
             "photo_url": sample_photos[i]
         }
         sample.append(athlete)
-    pd.DataFrame(sample).to_csv("sample_athletes.csv", index=False)
     df = pd.DataFrame(sample)
     df["video_url"] = df["video_url"].fillna("")
     df["photo_url"] = df["photo_url"].fillna("")
     return df
 
 # -------------------------------
-# Firestore loader
-# -------------------------------
-def load_firestore():
-    try:
-        import firebase_admin
-        from firebase_admin import credentials, firestore
-        if not os.environ.get("FIRESTORE_SERVICE_ACCOUNT"):
-            st.warning("Firestore not configured. Using local CSV data.")
-            return load_local_csv()
-        sa = json.loads(os.environ["FIRESTORE_SERVICE_ACCOUNT"])
-        if not firebase_admin._apps:
-            cred = credentials.Certificate(sa)
-            firebase_admin.initialize_app(cred)
-        db = firestore.client()
-        docs = db.collection("athletes").stream()
-        rows = [d.to_dict() for d in docs]
-        df = pd.DataFrame(rows)
-        if "date" in df.columns:
-            df["date"] = pd.to_datetime(df["date"])
-        if "video_url" in df.columns:
-            df["video_url"] = df["video_url"].fillna("")
-        if "photo_url" in df.columns:
-            df["photo_url"] = df["photo_url"].fillna("")
-        return df
-    except Exception as e:
-        st.error(f"Firestore load failed: {e}. Falling back to CSV.")
-        return load_local_csv()
-
-# -------------------------------
-# Load data
+# Load data (local CSV for now)
 # -------------------------------
 @st.cache_data
 def load_data():
-    if os.environ.get("USE_FIRESTORE") == "1":
-        return load_firestore()
     return load_local_csv()
 
 df = load_data()
 
 # -------------------------------
-# Colors
-# -------------------------------
-bg_color = "#111111" if dark_mode else "#FFFFFF"
-text_color = "#FFFFFF" if dark_mode else "#000000"
-
-# -------------------------------
 # Dashboard Title & KPIs
 # -------------------------------
+text_color = "#FFFFFF" if dark_mode else "#000000"
 st.markdown(f"<h1 style='color:{text_color}'>🏅 SAI-Assess — Athlete Dashboard</h1>", unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -129,7 +97,6 @@ col5.metric("Age Range", f"{df['age'].min()}–{df['age'].max()}")
 # -------------------------------
 # Sidebar Filters
 # -------------------------------
-st.sidebar.header("Filter Athletes")
 sport = st.sidebar.multiselect("Sport", options=sorted(df["sport"].unique()), default=sorted(df["sport"].unique()))
 state = st.sidebar.multiselect("State", options=sorted(df["state"].unique()), default=sorted(df["state"].unique()))
 age_range = st.sidebar.slider("Age range", 14, 30, (14,30))
@@ -143,12 +110,14 @@ filtered = df[(df["sport"].isin(sport)) &
 # -------------------------------
 left, right = st.columns([3,1])
 
+template = "plotly_dark" if dark_mode else "plotly_white"
+
 with left:
     st.subheader("Score Distribution")
     if not filtered.empty:
-        fig = px.histogram(filtered, x="score", nbins=12, color="gender", barmode="overlay", 
+        fig = px.histogram(filtered, x="score", nbins=12, color="gender", barmode="overlay",
                            title="Scores by Gender", marginal="box", hover_data=filtered.columns,
-                           template="plotly_dark" if dark_mode else "plotly_white")
+                           template=template)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No score data to show.")
@@ -156,17 +125,15 @@ with left:
     st.subheader("Average Score by State")
     if not filtered.empty:
         state_avg = filtered.groupby("state", as_index=False)["score"].mean().sort_values("score", ascending=False)
-        fig2 = px.bar(state_avg, x="state", y="score", color="score", color_continuous_scale="Viridis", 
-                      title="Avg Score by State", text_auto=".2f",
-                      template="plotly_dark" if dark_mode else "plotly_white")
+        fig2 = px.bar(state_avg, x="state", y="score", color="score", color_continuous_scale="Viridis",
+                      title="Avg Score by State", text_auto=".2f", template=template)
         st.plotly_chart(fig2, use_container_width=True)
 
     st.subheader("Score Heatmap by State & Sport")
     if not filtered.empty:
         heatmap_data = filtered.groupby(["state","sport"], as_index=False)["score"].mean()
         fig3 = px.density_heatmap(heatmap_data, x="sport", y="state", z="score", color_continuous_scale="Viridis",
-                                  title="Average Score Heatmap",
-                                  template="plotly_dark" if dark_mode else "plotly_white")
+                                  title="Average Score Heatmap", template=template)
         st.plotly_chart(fig3, use_container_width=True)
 
     st.subheader("Athlete Locations")
@@ -189,7 +156,7 @@ with right:
         st.info("No athletes to show.")
 
 # -------------------------------
-# Athlete Drill-down & Comparison (Professional Layout)
+# Athlete Drill-down & Comparison
 # -------------------------------
 st.markdown("---")
 st.subheader("Athlete Profile Drill-down")
@@ -200,10 +167,40 @@ for aid in athlete_selection:
     profile = df[df["athlete_id"]==aid].iloc[0].to_dict()
     
     # Title
-    st.markdown(f"### {profile['name']} — {profile['sport']}")
+    st.markdown(f"### {profile['name']} — {profile['sport']}", unsafe_allow_html=True)
     
     # Layout: Photo + Details Table + Metrics
     cols = st.columns([1,2])
     
     # Photo
+    with cols[0]:
+        st.image(profile.get("photo_url"), width=120)
+    
+    # Details Table
+    with cols[1]:
+        detail_data = {
+            "Attribute": ["Athlete ID","Name","Age","Gender","Sport","State","Date","Verified"],
+            "Value": [profile["athlete_id"], profile["name"], profile["age"], profile["gender"],
+                      profile["sport"], profile["state"], profile["date"].strftime("%Y-%m-%d"),
+                      "✅ Yes" if profile["verified"] else "❌ No"]
+        }
+        st.markdown(f"<div style='color:{text_color}'>", unsafe_allow_html=True)
+        st.table(pd.DataFrame(detail_data))
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Metrics
+    metric_cols = st.columns(3)
+    metric_cols[0].metric("Score", profile["score"])
+    metric_cols[1].metric("Age", profile["age"])
+    metric_cols[2].metric("Verified", "Yes" if profile["verified"] else "No")
+    
+    # Video
+    video_url = profile.get("video_url")
+    if video_url and isinstance(video_url,str) and video_url.strip()!="":
+        st.video(video_url)
+    else:
+        st.info("No video available for this athlete.")
+
+st.caption("This dashboard is a professional starter template. Connect real Firestore or CSV data for full deployment.")
+
 
