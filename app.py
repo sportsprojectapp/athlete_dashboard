@@ -109,6 +109,101 @@ def load_data():
 df = load_data()
 
 # -------------------------------
+# Colors
+# -------------------------------
+bg_color = "#111111" if dark_mode else "#FFFFFF"
+text_color = "#FFFFFF" if dark_mode else "#000000"
+
+# -------------------------------
 # Dashboard Title & KPIs
 # -------------------------------
-bg_color = "#_
+st.markdown(f"<h1 style='color:{text_color}'>🏅 SAI-Assess — Athlete Dashboard</h1>", unsafe_allow_html=True)
+
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Total Athletes", len(df))
+col2.metric("Average Score", round(df["score"].mean(),1))
+col3.metric("Verified Athletes", int(df["verified"].sum()))
+col4.metric("Unique Sports", df["sport"].nunique())
+col5.metric("Age Range", f"{df['age'].min()}–{df['age'].max()}")
+
+# -------------------------------
+# Sidebar Filters
+# -------------------------------
+st.sidebar.header("Filter Athletes")
+sport = st.sidebar.multiselect("Sport", options=sorted(df["sport"].unique()), default=sorted(df["sport"].unique()))
+state = st.sidebar.multiselect("State", options=sorted(df["state"].unique()), default=sorted(df["state"].unique()))
+age_range = st.sidebar.slider("Age range", 14, 30, (14,30))
+
+filtered = df[(df["sport"].isin(sport)) & 
+              (df["state"].isin(state)) & 
+              (df["age"] >= age_range[0]) & (df["age"] <= age_range[1])]
+
+# -------------------------------
+# Layout: Left (charts) & Right (leaderboard)
+# -------------------------------
+left, right = st.columns([3,1])
+
+with left:
+    st.subheader("Score Distribution")
+    if not filtered.empty:
+        fig = px.histogram(filtered, x="score", nbins=12, color="gender", barmode="overlay", 
+                           title="Scores by Gender", marginal="box", hover_data=filtered.columns,
+                           template="plotly_dark" if dark_mode else "plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No score data to show.")
+
+    st.subheader("Average Score by State")
+    if not filtered.empty:
+        state_avg = filtered.groupby("state", as_index=False)["score"].mean().sort_values("score", ascending=False)
+        fig2 = px.bar(state_avg, x="state", y="score", color="score", color_continuous_scale="Viridis", 
+                      title="Avg Score by State", text_auto=".2f",
+                      template="plotly_dark" if dark_mode else "plotly_white")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.subheader("Score Heatmap by State & Sport")
+    if not filtered.empty:
+        heatmap_data = filtered.groupby(["state","sport"], as_index=False)["score"].mean()
+        fig3 = px.density_heatmap(heatmap_data, x="sport", y="state", z="score", color_continuous_scale="Viridis",
+                                  title="Average Score Heatmap",
+                                  template="plotly_dark" if dark_mode else "plotly_white")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    st.subheader("Athlete Locations")
+    if {"lat","lon"}.issubset(filtered.columns):
+        fig_map = px.scatter_mapbox(filtered, lat="lat", lon="lon", hover_name="name", hover_data=["sport","score"],
+                                    color="score", size="score", color_continuous_scale="Viridis", zoom=3, height=400)
+        fig_map.update_layout(mapbox_style="carto-darkmatter" if dark_mode else "open-street-map")
+        st.plotly_chart(fig_map, use_container_width=True)
+    else:
+        st.info("Latitude/Longitude data not available.")
+
+with right:
+    st.subheader("Top 10 Athletes")
+    if not filtered.empty:
+        top10 = filtered.sort_values("score", ascending=False).head(10)[["athlete_id","name","sport","state","score","date"]]
+        st.dataframe(top10.reset_index(drop=True))
+        csv = top10.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Top 10 CSV", data=csv, file_name="top10.csv", mime="text/csv")
+    else:
+        st.info("No athletes to show.")
+
+# -------------------------------
+# Athlete Drill-down & Comparison (Professional Layout)
+# -------------------------------
+st.markdown("---")
+st.subheader("Athlete Profile Drill-down")
+
+athlete_selection = st.multiselect("Select Athlete(s) for comparison", options=df["athlete_id"].tolist(), default=[df["athlete_id"].iloc[0]])
+
+for aid in athlete_selection:
+    profile = df[df["athlete_id"]==aid].iloc[0].to_dict()
+    
+    # Title
+    st.markdown(f"### {profile['name']} — {profile['sport']}")
+    
+    # Layout: Photo + Details Table + Metrics
+    cols = st.columns([1,2])
+    
+    # Photo
+
