@@ -3,28 +3,61 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import random
 
 st.set_page_config(page_title="SAI-Assess Dashboard", layout="wide", page_icon="🏃‍♂️")
 
 # -------------------------------
-# Load data
+# Sample data generator
 # -------------------------------
 @st.cache_data
 def load_local_csv():
-    if not os.path.exists("sample_athletes.csv"):
-        sample = [
-            {"athlete_id":"A001","name":"Raj","age":16,"gender":"M","sport":"Sprinting","state":"Uttar Pradesh","score":78,"lat":26.8467,"lon":80.9462,"date":"2025-07-10","verified":True,"video_url":"https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"},
-            {"athlete_id":"A002","name":"Priya","age":15,"gender":"F","sport":"Long Jump","state":"Karnataka","score":84,"lat":12.9716,"lon":77.5946,"date":"2025-07-12","verified":True,"video_url":"https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"},
-            {"athlete_id":"A003","name":"Rahul","age":17,"gender":"M","sport":"High Jump","state":"Maharashtra","score":69,"lat":19.0760,"lon":72.8777,"date":"2025-07-11","verified":False,"video_url":""},
-            {"athlete_id":"A004","name":"Anita","age":14,"gender":"F","sport":"Sprinting","state":"Tamil Nadu","score":91,"lat":13.0827,"lon":80.2707,"date":"2025-07-13","verified":True,"video_url":"https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"},
-            {"athlete_id":"A005","name":"Sunil","age":18,"gender":"M","sport":"Long Jump","state":"Punjab","score":72,"lat":31.1471,"lon":75.3412,"date":"2025-07-14","verified":False,"video_url":""}
-        ]
-        pd.DataFrame(sample).to_csv("sample_athletes.csv", index=False)
-    df = pd.read_csv("sample_athletes.csv", parse_dates=["date"])
-    if "video_url" in df.columns:
-        df["video_url"] = df["video_url"].fillna("")
+    sports = ["Sprinting", "Long Jump", "High Jump", "Shot Put", "Javelin", 
+              "Discus", "Swimming", "Cycling", "Gymnastics", "Wrestling"]
+
+    states = ["Kerala", "Kerala", "Kerala", "Kerala", "Kerala", 
+              "Karnataka", "Maharashtra", "Tamil Nadu", "Punjab", "Uttar Pradesh",
+              "Bihar", "Rajasthan", "Goa", "Delhi", "Haryana", 
+              "Gujarat", "Madhya Pradesh", "Odisha", "Assam", "West Bengal"]
+
+    # 10 working sample video URLs (public sample videos)
+    sample_videos = [
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4",
+        "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4"
+    ]
+
+    sample = []
+    for i in range(20):
+        video_url = sample_videos[i] if i < 10 else ""
+        athlete = {
+            "athlete_id": f"A{str(i+1).zfill(3)}",
+            "name": f"Athlete_{i+1}",
+            "age": random.randint(14,18),
+            "gender": random.choice(["M","F"]),
+            "sport": sports[i % len(sports)],
+            "state": states[i],
+            "score": random.randint(60,95),
+            "lat": round(random.uniform(8.5,30.9),4),
+            "lon": round(random.uniform(75.0,80.5),4),
+            "date": datetime(2025, random.randint(7,9), random.randint(10,20)),
+            "verified": random.choice([True, False]),
+            "video_url": video_url
+        }
+        sample.append(athlete)
+    pd.DataFrame(sample).to_csv("sample_athletes.csv", index=False)
+    df = pd.DataFrame(sample)
+    df["video_url"] = df["video_url"].fillna("")
     return df
 
+# -------------------------------
 def load_firestore():
     try:
         import firebase_admin
@@ -64,9 +97,9 @@ st.title("🏅 SAI-Assess — Athlete Dashboard")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Athletes", len(df))
-col2.metric("Average Score", round(df["score"].mean(),1) if "score" in df.columns else "—")
-col3.metric("Verified Athletes", int(df["verified"].sum()) if "verified" in df.columns else "—")
-col4.metric("Unique Sports", df["sport"].nunique() if "sport" in df.columns else "—")
+col2.metric("Average Score", round(df["score"].mean(),1))
+col3.metric("Verified Athletes", int(df["verified"].sum()))
+col4.metric("Unique Sports", df["sport"].nunique())
 
 # -------------------------------
 # Sidebar Filters
@@ -88,7 +121,8 @@ left, right = st.columns([3,1])
 with left:
     st.subheader("Score Distribution")
     if not filtered.empty:
-        fig = px.histogram(filtered, x="score", nbins=10, color="gender", barmode="overlay", title="Scores by Gender")
+        fig = px.histogram(filtered, x="score", nbins=10, color="gender", barmode="overlay", 
+                           title="Scores by Gender", marginal="box", hover_data=filtered.columns)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No score data to show.")
@@ -96,7 +130,8 @@ with left:
     st.subheader("Average Score by State")
     if not filtered.empty:
         state_avg = filtered.groupby("state", as_index=False)["score"].mean().sort_values("score", ascending=False)
-        fig2 = px.bar(state_avg, x="state", y="score", color="score", color_continuous_scale="Viridis", title="Avg Score by State")
+        fig2 = px.bar(state_avg, x="state", y="score", color="score", color_continuous_scale="Viridis", 
+                      title="Avg Score by State", text_auto=".2f")
         st.plotly_chart(fig2, use_container_width=True)
 
     st.subheader("Athlete Locations")
@@ -132,7 +167,7 @@ if not df.empty:
     else:
         st.info("No video available for this athlete.")
 
-# -------------------------------
 st.caption("This dashboard is a starter template. Connect real Firestore or CSV data for full deployment.")
+
 
 
